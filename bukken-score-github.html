@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>出店物件スコア</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js"></script>
+<style>
+:root{
+  --bg:#F4F6F8; --surface:#FFFFFF; --ink:#18212E; --muted:#657080; --line:#DDE2E8;
+  --primary:#0F5C63; --primary-ink:#FFFFFF;
+  --S:#0F5C63; --A:#3C8A6A; --B:#B8901C; --C:#B0435A; --warn:#B0435A; --soft:#E9EEF2;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#10161D; --surface:#18212B; --ink:#E8EDF2; --muted:#98A3B0; --line:#2A3542;
+    --primary:#4FB3B9; --primary-ink:#0B1A1C;
+    --S:#4FB3B9; --A:#6CC39B; --B:#E0B94A; --C:#E27A8F; --warn:#E27A8F; --soft:#212C38;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#10161D; --surface:#18212B; --ink:#E8EDF2; --muted:#98A3B0; --line:#2A3542;
+  --primary:#4FB3B9; --primary-ink:#0B1A1C;
+  --S:#4FB3B9; --A:#6CC39B; --B:#E0B94A; --C:#E27A8F; --warn:#E27A8F; --soft:#212C38;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
+  font-size:15px;line-height:1.6;font-variant-numeric:tabular-nums}
+.wrap{max-width:760px;margin:0 auto;padding:20px 16px 48px}
+header h1{font-size:26px;font-weight:900;margin:4px 0 2px;letter-spacing:.01em}
+header p{margin:0;color:var(--muted);font-size:13px}
+nav{display:flex;gap:6px;margin:18px 0 16px;background:var(--soft);padding:4px;border-radius:12px}
+nav button{flex:1;border:0;background:transparent;color:var(--muted);font:inherit;font-weight:700;
+  padding:9px 4px;border-radius:9px;cursor:pointer}
+nav button[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.status{font-size:12px;color:var(--muted);margin:-6px 0 12px}
+.group-title{font-size:13px;font-weight:700;color:var(--muted);margin:22px 0 8px}
+.row{display:flex;gap:14px;align-items:center;background:var(--surface);border:1px solid var(--line);
+  border-radius:14px;padding:14px;margin-bottom:10px;cursor:pointer;width:100%;text-align:left;font:inherit;color:inherit}
+.swatch{flex:none;width:62px;height:62px;border-radius:50%;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;color:#fff;line-height:1}
+.swatch b{font-size:22px;font-weight:900}
+.swatch span{font-size:11px;margin-top:3px;opacity:.9}
+.row .main{flex:1;min-width:0}
+.row .name{font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .meta{font-size:12px;color:var(--muted)}
+.kv{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12.5px;margin-top:4px}
+.kv em{font-style:normal;color:var(--muted);margin-right:4px}
+.flag{display:inline-block;font-size:11px;color:var(--warn);border:1px solid var(--warn);border-radius:6px;padding:0 6px;margin:4px 4px 0 0}
+.tag{display:inline-block;font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:0 6px;margin-left:6px;vertical-align:1px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px}
+.detail-head{display:flex;gap:16px;align-items:center}
+.detail-head .swatch{width:84px;height:84px}
+.detail-head .swatch b{font-size:30px}
+.detail-head h2{margin:0;font-size:19px}
+.bars{margin-top:6px}
+.bar{display:grid;grid-template-columns:7.5em 1fr 3.4em;gap:10px;align-items:center;font-size:13px;margin:7px 0}
+.bar .track{height:8px;background:var(--soft);border-radius:4px;overflow:hidden}
+.bar .fill{height:100%;background:var(--primary);border-radius:4px}
+.bar .pt{text-align:right;color:var(--muted)}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+td{padding:7px 0;border-bottom:1px solid var(--line);vertical-align:top}
+td:last-child{text-align:right;font-weight:700}
+tr:last-child td{border-bottom:0}
+td small{display:block;font-weight:400;color:var(--muted);font-size:11.5px}
+h3{font-size:15px;margin:0 0 8px}
+form .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+label{display:block;font-size:12.5px;font-weight:700;color:var(--muted)}
+label.full{grid-column:1/-1}
+input,select,textarea{display:block;width:100%;margin-top:4px;font:inherit;font-weight:400;color:var(--ink);
+  background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:9px 10px}
+textarea{min-height:64px;resize:vertical}
+.check{display:flex;gap:8px;align-items:center;font-weight:400;color:var(--ink)}
+.check input{width:auto;margin:0}
+.hint{font-size:11.5px;color:var(--muted);font-weight:400;margin-top:3px}
+.actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+.btn{border:0;border-radius:10px;padding:11px 18px;font:inherit;font-weight:700;cursor:pointer}
+.btn.primary{background:var(--primary);color:var(--primary-ink)}
+.btn.ghost{background:var(--soft);color:var(--ink)}
+.btn.danger{background:transparent;color:var(--warn);border:1px solid var(--warn)}
+.shot{border:1.5px dashed var(--primary);border-radius:14px;padding:16px;margin-bottom:12px;background:var(--surface)}
+.shot[hidden]{display:none}
+.shot p{margin:4px 0 12px;font-size:13px;color:var(--muted)}
+.shot .pick{display:inline-block}
+.shot .pick[hidden]{display:none}
+.shot input[type=file][hidden]{display:none}
+.shot input[type=file]{display:block;width:100%;font:inherit;font-size:13px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:10px}
+.shot .msg{font-size:13px;margin-top:10px}
+.shot .msg.err{color:var(--warn)}
+.filled{background:color-mix(in srgb, var(--primary) 12%, var(--bg))}
+.empty{text-align:center;color:var(--muted);padding:30px 10px}
+.note{font-size:12.5px;color:var(--muted);white-space:pre-wrap}
+.legend{font-size:12px;color:var(--muted);line-height:1.7}
+@media (max-width:420px){ form .grid{grid-template-columns:1fr} .bar{grid-template-columns:6.5em 1fr 3em} }
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>出店物件スコア</h1>
+    <p>既存3店舗の実績を基準に、候補物件を100点満点で採点します</p>
+  </header>
+  <nav role="tablist">
+    <button role="tab" data-tab="list" aria-selected="true">物件一覧</button>
+    <button role="tab" data-tab="form" aria-selected="false">追加</button>
+    <button role="tab" data-tab="areas" aria-selected="false">探索エリア</button>
+    <button role="tab" data-tab="settings" aria-selected="false">前提</button>
+  </nav>
+  <div class="status" id="status">読み込み中…</div>
+  <main id="view"></main>
+</div>
+
+<script>
+const SEED_PROPS = [{"actualRevenue": null, "appeal": 4, "busy": true, "commuteMin": 15, "floor": "2-5F", "floorLabel": "階数要確認", "hpb": 5, "interior": 4000, "kind": "candidate", "lines": 3, "living": 2, "name": "銀座駅 徒歩4分 38坪（事務所仕様）", "night": 4, "nightChecked": false, "note": "最終更新2025年1月20日で約20か月募集中。事務所仕様のため給排水工事で内装費を仮に4,000万円としている。階数・管理費は要確認", "rent": 106, "seats": null, "station": "銀座駅", "tsubo": 38, "updatedAt": 4, "vacancy": 0, "walk": 4, "weekend": 4, "id": "c-ginza"}, {"actualRevenue": null, "appeal": 4, "busy": false, "commuteMin": 15, "floor": "2-5F", "floorLabel": "3F", "hpb": 4, "interior": null, "kind": "candidate", "lines": 2, "living": 3, "name": "東新宿駅 徒歩2分 3F", "night": 3, "nightChecked": false, "note": "賃料発生日を内装着工（3月）に合わせる交渉中。空家賃が出る場合は月数を入力。求人は「新宿勤務」で打てる強みあり。新宿三丁目駅から徒歩5分でHPBの新宿系エリア表記の見込み", "rent": 100, "seats": null, "station": "東新宿駅", "tsubo": 42, "updatedAt": 2, "vacancy": 0, "walk": 2, "weekend": 3, "id": "c-higashishinjuku"}, {"actualRevenue": null, "appeal": 1, "busy": true, "commuteMin": 15, "floor": "2-5F", "floorLabel": "3F", "hpb": 5, "interior": 2000, "kind": "candidate", "lines": 4, "living": 3, "name": "新宿駅 徒歩6分 3F（歌舞伎町・美容室居抜き）", "night": 1, "nightChecked": false, "note": "居抜きのため内装費を2,000万円で仮置き", "rent": 187, "seats": null, "station": "新宿駅", "tsubo": 41, "updatedAt": 2, "vacancy": 0, "walk": 6, "weekend": 3, "id": "c-kabukicho"}, {"actualRevenue": null, "appeal": 5, "busy": true, "commuteMin": 5, "floor": "2-5F", "floorLabel": "2F", "hpb": 5, "interior": null, "kind": "candidate", "lines": 2, "living": 4, "name": "吉祥寺駅 徒歩1分 2F 35坪", "night": 4, "nightChecked": false, "note": "武蔵野市吉祥寺南町・井の頭線南側。スケルトン。物件番号49888。管理費記載なし（要確認）。既存の吉祥寺店（本町2丁目）と商圏が重なる点の検討が必要", "rent": 89.1, "seats": null, "source": "chat", "station": "吉祥寺駅", "tsubo": 35, "updatedAt": 5, "vacancy": 0, "walk": 1, "weekend": 5, "id": "c-kichijoji-minami"}, {"actualRevenue": null, "appeal": 3, "busy": false, "commuteMin": 20, "floor": "B", "floorLabel": "B1", "hpb": 3, "interior": null, "kind": "candidate", "lines": 2, "living": 3, "name": "南新宿駅 徒歩6分 地下（新築）", "night": 3, "nightChecked": false, "note": "スケルトン。地下の排水・換気工事で内装費が上振れする可能性", "rent": 136.5, "seats": null, "station": "南新宿駅", "tsubo": 39.4, "updatedAt": 2, "vacancy": 0, "walk": 6, "weekend": 3, "id": "c-minamishinjuku"}, {"actualRevenue": null, "appeal": 2, "busy": false, "commuteMin": 20, "floor": "2-5F", "floorLabel": "4F", "hpb": 3, "interior": null, "kind": "candidate", "lines": 2, "living": 3, "name": "オーチュー第7ビル 4F（西新宿）", "night": 2, "nightChecked": false, "note": "88万円が管理費込みか要確認。徒歩分数は仮の値", "rent": 88, "seats": null, "station": "都庁前駅", "tsubo": 35.65, "updatedAt": 2, "vacancy": 0, "walk": 5, "weekend": 1, "id": "c-ochu7"}, {"actualRevenue": null, "appeal": 4, "busy": true, "commuteMin": 15, "floor": "2-5F", "floorLabel": "2F", "hpb": 5, "interior": null, "kind": "candidate", "lines": 4, "living": 3, "name": "新宿三丁目駅 徒歩4分 2F", "night": 5, "nightChecked": false, "note": "管理費0円。坪3.5万円（月約153万円）まで下がれば検討", "rent": 216, "seats": null, "station": "新宿三丁目駅", "tsubo": 43.64, "updatedAt": 2, "vacancy": 0, "walk": 4, "weekend": 5, "id": "c-sanchome"}, {"actualRevenue": null, "appeal": 2, "busy": true, "commuteMin": 15, "floor": "6F+", "floorLabel": "8F", "hpb": 5, "interior": null, "kind": "candidate", "lines": 4, "living": 3, "name": "西武新宿駅 徒歩1分 8F", "night": 2, "nightChecked": false, "note": "住所は歌舞伎町", "rent": 115.9, "seats": null, "station": "西武新宿駅", "tsubo": 40.5, "updatedAt": 2, "vacancy": 0, "walk": 1, "weekend": 4, "id": "c-seibushinjuku"}, {"actualRevenue": null, "appeal": 5, "busy": true, "commuteMin": 20, "floor": "1F", "floorLabel": "1F路面", "hpb": 4, "interior": null, "kind": "candidate", "lines": 2, "living": 3, "name": "下北沢駅 徒歩6分 1F路面（非公開）", "night": 4, "nightChecked": false, "note": "茶沢通り・緑道側。管理費は要確認。最終更新2026年4月21日で約5か月募集中。吉祥寺店と井の頭線で直結", "rent": 106.2, "seats": null, "station": "下北沢駅", "tsubo": 42, "updatedAt": 4, "vacancy": 0, "walk": 6, "weekend": 5, "id": "c-shimokita"}, {"actualRevenue": null, "appeal": 4, "busy": true, "commuteMin": 15, "floor": "2-5F", "floorLabel": "3F", "hpb": 5, "interior": null, "kind": "candidate", "lines": 4, "living": 3, "name": "TRES新宿 3F（新宿3-28-4）", "night": 5, "nightChecked": false, "note": "徒歩分数は仮の値。家賃比率9%に収めるには月商約1,670万円（1席185万円）が必要。指値の目安は115〜120万円", "rent": 150, "seats": 9, "station": "新宿駅東口", "tsubo": 35, "updatedAt": 3, "vacancy": 0, "walk": 3, "weekend": 5, "id": "c-tres-shinjuku"}, {"actualRevenue": 1400, "appeal": 5, "busy": true, "commuteMin": 25, "floor": "B", "floorLabel": "B1", "hpb": 5, "interior": null, "kind": "existing", "lines": 2, "living": 3, "name": "自由が丘（フィーノ自由が丘 B1）", "night": 4, "nightChecked": true, "note": "徒歩分数は仮の値（目安の7分）", "rent": 125, "seats": 14, "station": "自由が丘駅", "tsubo": 50, "updatedAt": 1, "vacancy": 0, "walk": 7, "weekend": 5, "id": "ex-jiyugaoka"}, {"actualRevenue": 1200, "appeal": 5, "busy": true, "commuteMin": 0, "floor": "2-5F", "floorLabel": "4F", "hpb": 5, "interior": null, "kind": "existing", "lines": 2, "living": 4, "name": "吉祥寺（テルキチジョウジ 4F）", "night": 4, "nightChecked": true, "note": "徒歩分数は仮の値（目安の7分）。月商はアベレージ1,200万円、MAX1,350万円（1席あたり169万円）", "rent": 70, "seats": 8, "station": "吉祥寺駅", "tsubo": 29, "updatedAt": 1, "vacancy": 0, "walk": 7, "weekend": 5, "id": "ex-kichijoji"}, {"actualRevenue": 1300, "appeal": 5, "busy": true, "commuteMin": 25, "floor": "B", "floorLabel": "B1", "hpb": 5, "interior": null, "kind": "existing", "lines": 3, "living": 2, "name": "表参道（SUN表参道 B1）", "night": 4, "nightChecked": true, "note": "徒歩分数は仮の値（目安の7分）。既存店で最短で月商1,000万円に到達", "rent": 121, "seats": 11, "station": "表参道駅", "tsubo": 40, "updatedAt": 1, "vacancy": 0, "walk": 7, "weekend": 5, "id": "ex-omotesando"}];
+const SEED_AREAS = [{"maxRent": 120, "maxTsubo": 50, "minTsubo": 30, "name": "高田馬場駅", "note": "", "tier": "normal", "updatedAt": 1, "id": "a-baba"}, {"name": "新宿御苑前", "note": "夜が暗い", "tier": "off", "updatedAt": 1, "id": "a-gyoen"}, {"maxRent": 120, "maxTsubo": 50, "minTsubo": 35, "name": "東新宿駅（明治通り沿い）", "note": "歌舞伎町側は除外", "tier": "normal", "updatedAt": 1, "id": "a-higashi"}, {"name": "歌舞伎町", "note": "夜の客層・採用面で不利", "tier": "off", "updatedAt": 1, "id": "a-kabuki"}, {"maxRent": 120, "maxTsubo": 50, "minTsubo": 30, "name": "神楽坂・飯田橋", "note": "", "tier": "normal", "updatedAt": 1, "id": "a-kagura"}, {"maxRent": 120, "maxTsubo": 50, "minTsubo": 30, "name": "吉祥寺駅", "note": "既存店あり。商圏が重ならないか要確認", "tier": "normal", "updatedAt": 2, "id": "a-kichijoji"}, {"maxRent": 120, "maxTsubo": 50, "minTsubo": 30, "name": "中野駅", "note": "新宿で採用母集団を作った後に出店予定", "tier": "normal", "updatedAt": 1, "id": "a-nakano"}, {"name": "西新宿・都庁前", "note": "夜と週末の人流が弱い", "tier": "off", "updatedAt": 1, "id": "a-nishi"}, {"maxRent": 150, "maxTsubo": 50, "minTsubo": 30, "name": "新宿三丁目駅周辺（伊勢丹〜明治通り沿い）", "note": "2〜5階の空中階を優先。坪3.5万円以下が目安", "tier": "hot", "updatedAt": 1, "id": "a-sanchome"}, {"maxRent": 150, "maxTsubo": 50, "minTsubo": 30, "name": "新宿駅 東口・南口・東南口", "note": "甲州街道沿い・新宿4丁目・代々木2丁目を含む", "tier": "hot", "updatedAt": 1, "id": "a-south"}, {"maxRent": 120, "maxTsubo": 50, "minTsubo": 30, "name": "代々木駅", "note": "", "tier": "normal", "updatedAt": 1, "id": "a-yoyogi"}];
+const DEFAULTS = {perSeat:117,low:100,high:144,labor:47,mat:8.5,other:17,hpb:110,interior:3500,equip:600,recruit:200,depositMonths:10,ramp:5,unitPrice:8000,days:26,tsuboPerSeat:3.6,crawlDays:3};
+let S = {...DEFAULTS};
+let props = [];
+let areas = [];
+let editingArea = null;
+let db = null, mode = 'local';
+let tab = 'list', selected = null, editing = null;
+
+const $ = s => document.querySelector(s);
+const fmt = (n, d=0) => (n==null||!isFinite(n)) ? '—' : n.toLocaleString('ja-JP',{maximumFractionDigits:d,minimumFractionDigits:d});
+const esc = s => String(s??'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num = v => (v===''||v==null) ? null : Number(v);
+
+function calc(p){
+  const seats = p.seats || Math.max(1, Math.round(p.tsubo / S.tsuboPerSeat));
+  const rev = p.actualRevenue || seats * S.perSeat;
+  const tsuboPrice = p.rent / p.tsubo;
+  const ratio = p.rent / rev * 100;
+  const varRate = (S.labor + S.mat + S.other) / 100;
+  const profit = rev * (1 - varRate) - S.hpb - p.rent;
+  const interior = (p.interior ?? null) !== null ? p.interior : S.interior;
+  const emptyRent = p.rent * (p.vacancy || 0);
+  const invest = interior + S.equip + S.recruit + emptyRent;
+  const deposit = p.rent * S.depositMonths;
+  const payback = profit > 0 ? S.ramp + invest / profit : Infinity;
+  const customers = rev * 10000 / S.unitPrice;
+  const perSeatDay = customers / (seats * S.days);
+  const walkLimit = p.busy ? 15 : 10;
+
+  const sc = {};
+  sc.ratio = ratio<=7?20:ratio<=9?17:ratio<=10?13:ratio<=12?6:0;
+  sc.tsubo = tsuboPrice<=2.5?10:tsuboPrice<=3?9:tsuboPrice<=3.5?6:tsuboPrice<=4?3:0;
+  sc.walk = p.busy ? (p.walk<=7?10:p.walk<=10?9:p.walk<=15?7:0) : (p.walk<=5?10:p.walk<=7?9:p.walk<=10?5:0);
+  sc.weekend = (p.weekend||0) * 3;
+  sc.payback = payback<=30?15:payback<=42?11:payback<=54?6:0;
+  sc.hpb = (p.hpb||3) * 3;
+  sc.night = (p.night||0) * 2;
+  sc.seats = seats>=12?5:seats>=10?4:seats>=8?3:1;
+  const total = Object.values(sc).reduce((a,b)=>a+b,0);
+  const rank = total>=85?'S':total>=72?'A':total>=58?'B':'C';
+
+  const flags = [];
+  if (p.walk > walkLimit) flags.push(`徒歩${walkLimit}分超`);
+  if (ratio > 10) flags.push('家賃比率10%超');
+  if (profit <= 0) flags.push('月次赤字');
+  if (p.floor==='6F+') flags.push('6F以上');
+  if (!p.nightChecked && p.kind!=='existing') flags.push('夜の現地確認まだ');
+  return {seats,rev,revLow:seats*S.low,revHigh:seats*S.high,tsuboPrice,ratio,profit,interior,emptyRent,invest,deposit,payback,customers,perSeatDay,walkLimit,sc,total,rank,flags};
+}
+
+function recruitCalc(p){
+  if(p.lines==null && p.commuteMin==null && p.appeal==null) return null;
+  const L=p.lines||1, M=p.commuteMin??60;
+  const sc={
+    lines: L>=4?25:L===3?18:L===2?12:5,
+    commute: M<=15?25:M<=30?18:M<=45?10:3,
+    appeal: (p.appeal||3)*6,
+    living: (p.living||3)*4
+  };
+  const total=Object.values(sc).reduce((a,b)=>a+b,0);
+  return {sc,total,rank: total>=85?'S':total>=72?'A':total>=58?'B':'C'};
+}
+const RCRIT=[['lines','乗り入れ路線',25],['commute','既存店から近い',25],['appeal','美容師に人気の街',30],['living','近くに住みやすい',20]];
+const CRIT = [
+  ['ratio','家賃比率',20],['hpb','HPBエリア集客',15],['weekend','週末の人流',15],['payback','投資回収',15],['tsubo','坪単価',10],['walk','駅徒歩',10],
+  ['night','夜の動線',10],['seats','席数規模',5]
+];
+
+function swatch(c, big){
+  return `<div class="swatch" style="background:var(--${c.rank})" aria-label="ランク${c.rank} ${c.total}点"><b>${c.rank}</b><span>${c.total}点</span></div>`;
+}
+
+function renderList(){
+  const cands = props.filter(p=>p.kind!=='existing').map(p=>({p,c:calc(p)})).sort((a,b)=>b.c.total-a.c.total);
+  const exist = props.filter(p=>p.kind==='existing').map(p=>({p,c:calc(p)})).sort((a,b)=>b.c.total-a.c.total);
+  const row = ({p,c}) => `
+    <button class="row" data-id="${esc(p.id)}">
+      ${swatch(c)}
+      <div class="main">
+        <div class="name">${esc(p.name)}${p.source==='gmail'?'<span class="tag">メール取得・要確認</span>':''}</div>
+        <div class="meta">${(()=>{const r=recruitCalc(p);return r?`<span style="color:var(--${r.rank});font-weight:700">採用 ${r.rank}（${r.total}点）</span> ・ `:'<span>採用 未評価</span> ・ ';})()}${esc(p.floorLabel||p.floor)} ・ ${fmt(p.tsubo,1)}坪 ・ 徒歩${fmt(p.walk)}分</div>
+        <div class="kv">
+          <span><em>月額</em>${fmt(p.rent,1)}万</span>
+          <span><em>坪単価</em>${fmt(c.tsuboPrice,2)}万</span>
+          <span><em>家賃比率</em>${fmt(c.ratio,1)}%</span>
+          <span><em>回収</em>${isFinite(c.payback)?fmt(c.payback)+'か月':'不可'}</span>
+        </div>
+        ${c.flags.map(f=>`<span class="flag">${esc(f)}</span>`).join('')}
+      </div>
+    </button>`;
+  $('#view').innerHTML = `
+    <div class="group-title">候補物件（スコア順）</div>
+    ${cands.length ? cands.map(row).join('') : `<div class="empty">候補物件がまだありません。「物件を追加」から登録してください。</div>`}
+    <div class="group-title">既存店（採点基準の確認用）</div>
+    ${exist.map(row).join('') || '<div class="empty">既存店データがありません</div>'}
+    <p class="legend">S 85点以上：即検討 ／ A 72点以上：条件交渉で検討 ／ B 58点以上：要注意 ／ C：見送り<br>10点未満の差は誤差の範囲。点数より、ランクと注意ラベルで判断してください。</p>`;
+  document.querySelectorAll('.row').forEach(b=>b.onclick=()=>{selected=b.dataset.id;renderDetail();});
+}
+
+function renderDetail(){
+  const p = props.find(x=>x.id===selected); if(!p){tab='list';return render();}
+  const c = calc(p);
+  const isEx = p.kind==='existing';
+  $('#view').innerHTML = `
+    <div class="actions" style="margin-top:0;margin-bottom:12px"><button class="btn ghost" id="back">一覧に戻る</button></div>
+    <div class="panel">
+      <div class="detail-head">${swatch(c,true)}
+        <div><h2>${esc(p.name)}${isEx?'<span class="tag">既存店</span>':''}</h2>
+        <div class="meta" style="color:var(--muted);font-size:13px">${esc(p.station||'')} ・ ${esc(p.floorLabel||p.floor)} ・ 徒歩${fmt(p.walk)}分${p.busy?'（歩いて楽しい街）':''}</div></div>
+      </div>
+      <div style="margin-top:6px">${c.flags.map(f=>`<span class="flag">${esc(f)}</span>`).join('')}</div>
+    </div>
+    <div class="panel"><h3>採点の内訳</h3><div class="bars">
+      ${CRIT.map(([k,l,m])=>`<div class="bar"><span>${l}</span><div class="track"><div class="fill" style="width:${c.sc[k]/m*100}%"></div></div><span class="pt">${c.sc[k]}/${m}</span></div>`).join('')}
+    </div></div>
+    ${(()=>{const r=recruitCalc(p); return `<div class="panel"><h3>スタッフの集まりやすさ ${r?`<span style="color:var(--${r.rank})">${r.rank}ランク・${r.total}点</span>`:'<span class="hint">未評価（編集から入力）</span>'}</h3>
+      ${r?`<div class="bars">${RCRIT.map(([k,l,m])=>`<div class="bar"><span>${l}</span><div class="track"><div class="fill" style="width:${r.sc[k]/m*100}%;background:var(--A)"></div></div><span class="pt">${r.sc[k]}/${m}</span></div>`).join('')}</div><p class="hint" style="margin:6px 0 0">出店スコアとは別枠の評価です</p>`:''}</div>`;})()}
+    <div class="panel"><h3>収支の見込み</h3><table>
+      <tr><td>席数<small>${p.seats?'手入力':`${S.tsuboPerSeat}坪/席で自動計算`}</small></td><td>${c.seats}席</td></tr>
+      <tr><td>月商${isEx?'（実績）':'（標準）'}<small>${isEx?'':`下限 ${fmt(c.revLow)}万 〜 上限 ${fmt(c.revHigh)}万`}</small></td><td>${fmt(c.rev)}万円</td></tr>
+      <tr><td>家賃比率</td><td>${fmt(c.ratio,1)}%</td></tr>
+      <tr><td>必要客数<small>客単価${fmt(S.unitPrice)}円で換算・1席1日 ${fmt(c.perSeatDay,1)}人</small></td><td>${fmt(c.customers)}名/月</td></tr>
+      <tr><td>月間営業利益<small>人件費・材料費・その他経費・HPB・家賃を控除</small></td><td>${fmt(c.profit)}万円</td></tr>
+    </table></div>
+    <div class="panel"><h3>初期投資と回収</h3><table>
+      <tr><td>内装費${(p.interior??null)!==null?'<small>物件ごとに手入力</small>':''}</td><td>${fmt(c.interior)}万円</td></tr>
+      <tr><td>設備・採用費</td><td>${fmt(S.equip+S.recruit)}万円</td></tr>
+      <tr><td>空家賃<small>${fmt(p.vacancy||0)}か月分</small></td><td>${fmt(c.emptyRent)}万円</td></tr>
+      <tr><td>投資額（保証金除く）</td><td>${fmt(c.invest)}万円</td></tr>
+      <tr><td>保証金<small>${S.depositMonths}か月分・退去時に返還</small></td><td>${fmt(c.deposit)}万円</td></tr>
+      <tr><td>投資回収期間<small>立ち上げ${S.ramp}か月＋投資額÷月間利益</small></td><td>${isFinite(c.payback)?fmt(c.payback)+'か月':'回収不可'}</td></tr>
+    </table></div>
+    ${p.note?`<div class="panel"><h3>メモ</h3><div class="note">${esc(p.note)}</div></div>`:''}
+    <div class="actions"><button class="btn primary" id="edit">編集する</button><button class="btn danger" id="del">削除する</button></div>`;
+  $('#back').onclick=()=>{selected=null;renderList();};
+  $('#edit').onclick=()=>{editing=p.id;tab='form';render();};
+  $('#del').onclick=async()=>{ if(!confirm(`「${p.name}」を削除しますか？`))return; await removeProp(p.id); selected=null; renderList(); };
+}
+
+function renderForm(){
+  const p = editing ? props.find(x=>x.id===editing) : {kind:'candidate',floor:'2-5F',night:3,busy:false,vacancy:0};
+  const v = (k)=> p[k]==null?'':esc(p[k]);
+  $('#view').innerHTML = `
+  ${editing?'':`<div class="shot" id="shot">
+    <h3>スクショ・文章から読み取る</h3>
+    <p>スクショか文章から、家賃・坪数・階数・駅徒歩と、夜・週末・HPB・採用の目安までまとめて入力します。</p>
+    <input type="file" id="shotfile" accept="image/*" multiple>
+    <div class="msg" id="shotimg" hidden>この環境では画像を直接読み取れません。iPhoneの文字認識を使うと同じことができます：<b>写真アプリでスクショを開く → 右下の文字認識マークを押す → 文字を長押しして「すべて選択」→「コピー」→ 下の欄に貼り付けて「読み取る」</b></div>
+    <label style="margin-top:12px">文章を貼り付け<textarea id="shottext" placeholder="物件ページの文章、スクショから文字認識でコピーしたテキスト、仲介会社からのメッセージなど"></textarea></label>
+    <div class="actions" style="margin-top:10px"><button class="btn primary" type="button" id="shotbtn">読み取る</button></div>
+    <div class="msg" id="shotmsg" role="status"></div>
+  </div>`}
+  <form class="panel" id="f">
+    <h3>${editing?'物件を編集':'物件を追加'}</h3>
+    <div class="grid">
+      <label class="full">物件名<input name="name" required value="${v('name')}" placeholder="例：東新宿駅 徒歩2分 3F"></label>
+      <label>最寄駅・エリア<input name="station" value="${v('station')}" placeholder="例：東新宿駅"></label>
+      <label>区分<select name="kind"><option value="candidate"${p.kind!=='existing'?' selected':''}>候補物件</option><option value="existing"${p.kind==='existing'?' selected':''}>既存店</option></select></label>
+      <label>月額（万円）<input name="rent" type="number" step="0.1" min="0" required value="${v('rent')}"><div class="hint">税込・管理費込み</div></label>
+      <label>坪数<input name="tsubo" type="number" step="0.01" min="1" required value="${v('tsubo')}"></label>
+      <label>階数の区分<select name="floor">${['B','1F','2-5F','6F+'].map(f=>`<option value="${f}"${p.floor===f?' selected':''}>${{B:'地下','1F':'1階','2-5F':'2〜5階','6F+':'6階以上'}[f]}</option>`).join('')}</select></label>
+      <label>階数の表記<input name="floorLabel" value="${v('floorLabel')}" placeholder="例：3F"></label>
+      <label>駅徒歩（分）<input name="walk" type="number" min="0" required value="${v('walk')}"></label>
+      <label>夜の動線（1〜5）<select name="night">${[1,2,3,4,5].map(n=>`<option${Number(p.night)===n?' selected':''}>${n}</option>`).join('')}</select><div class="hint">21時半〜22時の明るさ・人通り</div></label>
+      <label>HPBエリア集客（1〜5）<select name="hpb">${[1,2,3,4,5].map(n=>`<option${Number(p.hpb??3)===n?' selected':''}>${n}</option>`).join('')}</select><div class="hint">HPBで表示できる駅・小エリアの検索量</div></label>
+      <label>週末の人流（1〜5）<select name="weekend">${[1,2,3,4,5].map(n=>`<option${Number(p.weekend??3)===n?' selected':''}>${n}</option>`).join('')}</select><div class="hint">土日の20〜40代の人通り・買い物客</div></label>
+      <label>乗り入れ路線数<input name="lines" type="number" min="1" value="${v('lines')}"><div class="hint">徒歩圏で使える路線の数</div></label>
+      <label>最寄りの既存店から（分）<input name="commuteMin" type="number" min="0" value="${v('commuteMin')}"><div class="hint">ヘルプや異動のしやすさ</div></label>
+      <label>美容師に人気の街（1〜5）<select name="appeal">${[1,2,3,4,5].map(n=>`<option${Number(p.appeal??3)===n?' selected':''}>${n}</option>`).join('')}</select><div class="hint">働きたい街としてのブランド力</div></label>
+      <label>近くに住みやすい（1〜5）<select name="living">${[1,2,3,4,5].map(n=>`<option${Number(p.living??3)===n?' selected':''}>${n}</option>`).join('')}</select><div class="hint">通勤30分圏の家賃・住環境</div></label>
+      <label class="full check"><input type="checkbox" name="busy"${p.busy?' checked':''}> 新宿・渋谷のように歩いて退屈しない街（徒歩15分まで可）</label>
+      <label class="full check"><input type="checkbox" name="nightChecked"${p.nightChecked?' checked':''}> 夜の現地確認をした</label>
+      <label>着工までの空家賃（か月）<input name="vacancy" type="number" min="0" step="0.5" value="${v('vacancy')}"></label>
+      <label>内装費（万円）<input name="interior" type="number" min="0" value="${v('interior')}" placeholder="空欄＝${S.interior}"><div class="hint">居抜きなどで変わる場合のみ</div></label>
+      <label>席数<input name="seats" type="number" min="1" value="${v('seats')}" placeholder="空欄＝自動"></label>
+      <label>実績月商（万円）<input name="actualRevenue" type="number" min="0" value="${v('actualRevenue')}"><div class="hint">既存店のみ</div></label>
+      <label class="full">メモ<textarea name="note">${v('note')}</textarea></label>
+    </div>
+    <div class="actions"><button class="btn primary" type="submit">${editing?'変更を保存':'物件を追加'}</button>
+    <button class="btn ghost" type="button" id="cancel">キャンセル</button></div>
+  </form>`;
+  $('#cancel').onclick=()=>{editing=null;tab='list';render();};
+  const sb = $('#shotbtn'); if(sb) sb.onclick = readShot;
+  applyImgCaps();
+  const sfi = $('#shotfile'); if(sfi) sfi.onchange = ()=>{ const m=$('#shotmsg'); if(m){ m.className='msg'; m.textContent = sfi.files.length ? `${sfi.files.length}枚を選択しました。「読み取る」を押してください。` : ''; } };
+  $('#f').onsubmit=async e=>{
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const d = {
+      name:fd.get('name').trim(), station:fd.get('station').trim(), kind:fd.get('kind'),
+      rent:num(fd.get('rent')), tsubo:num(fd.get('tsubo')), floor:fd.get('floor'), floorLabel:fd.get('floorLabel').trim(),
+      walk:num(fd.get('walk')), night:num(fd.get('night')), weekend:num(fd.get('weekend')), hpb:num(fd.get('hpb')), lines:num(fd.get('lines')), commuteMin:num(fd.get('commuteMin')), appeal:num(fd.get('appeal')), living:num(fd.get('living')), busy:fd.get('busy')==='on', nightChecked:fd.get('nightChecked')==='on',
+      vacancy:num(fd.get('vacancy'))||0, interior:num(fd.get('interior')), seats:num(fd.get('seats')),
+      actualRevenue:num(fd.get('actualRevenue')), note:fd.get('note').trim(), updatedAt:Date.now()
+    };
+    const id = editing || ('p' + Date.now().toString(36) + Math.random().toString(36).slice(2,6));
+    await saveProp(id, d);
+    editing=null; selected=id; tab='list'; setTabs(); renderDetail();
+  };
+}
+
+function renderSettings(){
+  const F = [
+    ['perSeat','席あたり月商（標準・万円）','既存3店舗の合計月商÷総席数'],['low','席あたり月商（下限・万円）','自由が丘の実績'],['high','席あたり月商（上限・万円）','吉祥寺の実績'],
+    ['labor','人件費率（%）','フリー新規40%・指名50%の加重平均'],['mat','材料費率（%）',''],['other','その他経費率（%）','光熱費・消耗品・手数料・本部費など。年商4億・経常2,000万から逆算した仮の値'],
+    ['hpb','HPB掲載費（万円/月）',''],['interior','内装費（万円）',''],['equip','設備費（万円）',''],['recruit','採用費（万円）',''],
+    ['depositMonths','保証金（家賃のか月）',''],['ramp','立ち上げ期間（か月）','黒字化まで4〜6か月の中央'],['unitPrice','目標客単価（円）',''],['days','月の営業日数',''],['tsuboPerSeat','1席あたりの坪数','既存店の平均'],['crawlDays','Claudeの巡回間隔（日）','通常エリアの巡回頻度']
+  ];
+  $('#view').innerHTML = `
+  <form class="panel" id="sf"><h3>前提条件</h3>
+    <p class="hint" style="margin:0 0 12px">ここを変えると全物件のスコアが再計算されます。チーム全員に共通です。</p>
+    <div class="grid">${F.map(([k,l,h])=>`<label>${l}<input name="${k}" type="number" step="any" value="${S[k]}">${h?`<div class="hint">${h}</div>`:''}</label>`).join('')}</div>
+    <div class="actions"><button class="btn primary" type="submit">前提条件を保存</button><button class="btn ghost" type="button" id="reset">初期値に戻す</button></div>
+  </form>
+  <div class="panel"><h3>データの書き出し・読み込み</h3>
+    <p class="hint" style="margin:0 0 10px">物件・探索エリア・前提条件をまとめたファイルです。別の端末やスタッフと共有するときに使います。</p>
+    <div class="actions" style="margin-top:0"><button class="btn primary" type="button" id="exp">書き出す</button>
+    <label class="btn ghost" for="impf" style="margin:0">読み込む</label><input type="file" id="impf" accept="application/json" style="display:none"></div>
+    <div class="hint" id="iomsg"></div>
+  </div>
+  <div class="panel legend"><h3>採点の基準（100点）</h3>
+    家賃比率 20点：7%以下で満点、9%以下17点、10%以下13点、12%以下6点<br>
+    HPBエリア集客 15点：1〜5の評価×3<br>
+    週末の人流 15点：1〜5の評価×3<br>
+    投資回収 15点：30か月以下で満点、42か月以下11点、54か月以下6点<br>
+    坪単価 10点：2.5万以下で満点、3万以下9点、3.5万以下6点、4万以下3点<br>
+    駅徒歩 10点：通常は5分以下で満点・10分まで。歩いて楽しい街は7分以下で満点・15分まで<br>
+    夜の動線 10点：1〜5の評価×2<br>
+    席数規模 5点：12席以上で満点、10席以上4点、8席以上3点<br>
+    階数：既存店の実績から採点に含めない（6階以上は注意ラベルのみ）
+  </div>
+  <div class="panel legend"><h3>スタッフの集まりやすさ（別枠・100点）</h3>
+    乗り入れ路線 25点：4路線以上で満点、3路線18点、2路線12点、1路線5点<br>
+    既存店から近い 25点：15分以内で満点、30分以内18点、45分以内10点<br>
+    美容師に人気の街 30点：1〜5の評価×6<br>
+    近くに住みやすい 20点：1〜5の評価×4
+  </div>`;
+  $('#sf').onsubmit=async e=>{
+    e.preventDefault(); const fd=new FormData(e.target); const n={};
+    for(const [k] of F){ const x=Number(fd.get(k)); n[k]=isFinite(x)?x:DEFAULTS[k]; }
+    await saveSettings(n); setStatus('前提条件を保存しました');
+  };
+  $('#exp').onclick=()=>{
+    const blob = new Blob([JSON.stringify({props,areas,settings:S,exportedAt:new Date().toISOString()},null,2)],{type:'application/json'});
+    const url = URL.createObjectURL(blob); const a2=document.createElement('a');
+    a2.href=url; a2.download='bukken-score-'+new Date().toISOString().slice(0,10)+'.json'; a2.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1000); $('#iomsg').textContent='書き出しました。';
+  };
+  $('#impf').onchange=async e=>{
+    const file=e.target.files[0]; if(!file) return;
+    try{
+      const j=JSON.parse(await file.text());
+      if(!Array.isArray(j.props)) throw new Error('形式が違います');
+      if(!confirm('今のデータを、読み込んだ内容で置き換えます。よろしいですか？')) { e.target.value=''; return; }
+      props=j.props; areas=Array.isArray(j.areas)?j.areas:areas; S={...DEFAULTS,...(j.settings||{})};
+      lsSet('props',props); lsSet('areas',areas); lsSet('settings',S);
+      $('#iomsg').textContent='読み込みました。'; renderSettings();
+    }catch(err){ $('#iomsg').textContent='読み込めませんでした（'+(err&&err.message||'error')+'）'; }
+    finally{ e.target.value=''; }
+  };
+  $('#reset').onclick=async()=>{ await saveSettings({...DEFAULTS}); renderSettings(); setStatus('初期値に戻しました'); };
+}
+
+function applyImgCaps(){}
+
+function parseText(t){
+  t = String(t||'').replace(/[０-９．，]/g, c=>({'．':'.','，':','}[c] || String.fromCharCode(c.charCodeAt(0)-0xFEE0)));
+  const num = x => Number(String(x).replace(/,/g,''));
+  const d = {};
+  let rent = null;
+  const mY = t.match(/賃料[^0-9]{0,12}([0-9][0-9,]{3,})\s*円/) || t.match(/([0-9][0-9,]{5,})\s*円\s*\(?\s*税込/);
+  const mM = t.match(/賃料[^0-9]{0,12}([0-9]+(?:\.[0-9]+)?)\s*万/) || t.match(/([0-9]+(?:\.[0-9]+)?)\s*万円/);
+  if(mY) rent = num(mY[1])/10000;
+  else if(mM) rent = num(mM[1]);
+  const mK = t.match(/(?:管理費|共益費|管・?共)[^0-9]{0,12}([0-9][0-9,]{3,})\s*円/);
+  if(rent!=null && mK) rent += num(mK[1])/10000;
+  if(rent!=null) d.rent = Math.round(rent*10)/10;
+  const mT = t.match(/([0-9]+(?:\.[0-9]+)?)\s*坪/);
+  const mSq = t.match(/([0-9]+(?:\.[0-9]+)?)\s*(?:m2|m²|㎡)/i);
+  if(mT) d.tsubo = num(mT[1]);
+  else if(mSq) d.tsubo = Math.round(num(mSq[1])/3.3058*100)/100;
+  const mW = t.match(/徒歩\s*([0-9]+)\s*分/);
+  if(mW) d.walk = num(mW[1]);
+  const mS = t.match(/([一-龥ぁ-んァ-ヶーA-Za-z0-9]{2,12})駅/);
+  if(mS) d.station = mS[1] + '駅';
+  const mF = t.match(/(地下\s*[0-9]?|B\s*[0-9]|[0-9]{1,2}\s*[FfＦ]|[0-9]{1,2}\s*階)/);
+  if(mF){
+    const raw = mF[1].replace(/\s/g,'');
+    d.floorLabel = raw.replace(/階/,'F').replace(/^地下([0-9]?)$/,(m,n)=>'B'+(n||1)).toUpperCase();
+    const n = Number((d.floorLabel.match(/[0-9]+/)||[0])[0]);
+    d.floor = /^B|地下/.test(d.floorLabel) ? 'B' : n>=6 ? '6F+' : n===1 ? '1F' : '2-5F';
+  }
+  if(/スケルトン/.test(t)) d.type='スケルトン'; else if(/居抜/.test(t)) d.type='居抜き';
+  d.name = [d.station, d.walk!=null?`徒歩${d.walk}分`:'', d.floorLabel||'', d.tsubo?d.tsubo+'坪':''].filter(Boolean).join(' ');
+  return d;
+}
+
+async function shrinkImg(file){
+  try{
+    const bmp = await createImageBitmap(file);
+    const k = Math.min(1, 2000/Math.max(bmp.width,bmp.height));
+    const c = document.createElement('canvas'); c.width=Math.round(bmp.width*k); c.height=Math.round(bmp.height*k);
+    const ctx=c.getContext('2d'); ctx.drawImage(bmp,0,0,c.width,c.height);
+    return await new Promise(r=>c.toBlob(b=>r(b||file),'image/png'));
+  }catch(e){ return file; }
+}
+
+async function ocr(files, msg){
+  if(!window.Tesseract) throw new Error('OCRライブラリを読み込めませんでした');
+  let out='';
+  for(let i=0;i<files.length;i++){
+    const img = await shrinkImg(files[i]);
+    const r = await Tesseract.recognize(img, 'jpn+eng', {
+      logger: m => { if(m.status==='recognizing text') msg.textContent = `文字を読み取り中…（${i+1}/${files.length}・${Math.round((m.progress||0)*100)}%）`; }
+    });
+    out += (r && r.data && r.data.text || '') + '\n';
+  }
+  return out;
+}
+
+async function readShot(){
+  const input = $('#shotfile'), btn = $('#shotbtn'), msg = $('#shotmsg');
+  const files = Array.from((input&&input.files)||[]);
+  const text = ($('#shottext').value||'').trim();
+  if(!files.length && !text){ msg.className='msg err'; msg.textContent='スクショを選ぶか、文章を貼り付けてください。'; return; }
+  msg.className='msg'; msg.textContent = files.length ? '読み取りの準備をしています…（初回は辞書の読み込みに30秒ほどかかります）' : '読み取っています…';
+  if(btn) btn.disabled = true;
+  try{
+    const raw = files.length ? await ocr(files, msg) : text;
+    const d = parseText(raw + '\n' + text);
+    const f = $('#f');
+    const set = (k,v)=>{ if(v===null||v===undefined||v==='') return false; const el=f.elements[k]; if(!el) return false; el.value=v; el.classList.add('filled'); return true; };
+    let n=0;
+    n+=set('name', d.name); n+=set('station', d.station);
+    n+=set('rent', d.rent); n+=set('tsubo', d.tsubo); n+=set('walk', d.walk);
+    n+=set('floorLabel', d.floorLabel); if(d.floor) n+=set('floor', d.floor);
+    const note = ['スクショ・文章から自動入力', d.type||''].filter(Boolean).join('。');
+    n+=set('note', note);
+    const miss=[]; if(d.rent==null)miss.push('賃料'); if(d.tsubo==null)miss.push('坪数'); if(d.walk==null)miss.push('駅徒歩');
+    msg.className = miss.length ? 'msg err' : 'msg';
+    msg.textContent = n ? `${n}項目を入力しました。${miss.length?'読み取れなかった項目：'+miss.join('・')+'。':''}夜・週末・HPB・採用の各項目を選んでから保存してください。` : '物件情報を読み取れませんでした。手入力で登録してください。';
+    f.scrollIntoView({behavior:'smooth', block:'start'});
+  }catch(e){
+    msg.className='msg err'; msg.textContent = '読み取りに失敗しました（' + (e&&e.message||'error') + '）。文章を貼り付けるか、手入力で登録してください。';
+  }finally{ if(btn) btn.disabled=false; }
+}
+
+function setTabs(){ document.querySelectorAll('nav button').forEach(b=>b.setAttribute('aria-selected', String(b.dataset.tab===tab))); }
+function render(){ setTabs(); if(tab==='list'){ selected?renderDetail():renderList(); } else if(tab==='form'){ renderForm(); } else if(tab==='areas'){ renderAreas(); } else renderSettings(); }
+
+const TIERS = {hot:['激戦区','新着はサイト通知で社長に直送。Claudeは巡回しない'],normal:['通常エリア','Claudeが定期巡回して採点し、A以上だけ通知'],off:['除外','巡回も通知もしない']};
+function renderAreas(){
+  const group = t => areas.filter(a=>a.tier===t).sort((a,b)=>(a.name||'').localeCompare(b.name||'','ja'));
+  const card = a => `
+    <div class="panel" style="padding:12px 14px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+        <div><div style="font-weight:700">${esc(a.name)}</div>
+          <div class="meta" style="font-size:12.5px;color:var(--muted)">${a.tier==='off'?'対象外':`${fmt(a.minTsubo)}〜${fmt(a.maxTsubo)}坪 ・ 月額${fmt(a.maxRent)}万円以下`}</div>
+          ${a.note?`<div class="note" style="margin-top:2px">${esc(a.note)}</div>`:''}</div>
+        <div style="display:flex;gap:6px;flex:none"><button class="btn ghost" style="padding:6px 10px" data-ea="${esc(a.id)}">編集</button></div>
+      </div>
+    </div>`;
+  const a = editingArea ? areas.find(x=>x.id===editingArea) : {tier:'normal',minTsubo:30,maxTsubo:50,maxRent:120};
+  const v = k => a[k]==null?'':esc(a[k]);
+  $('#view').innerHTML = `
+    <div class="panel legend" style="margin-bottom:14px">
+      この一覧は、物件を読み取ったときに対象エリアを判定するために使います。
+    </div>
+    ${['hot','normal','off'].map(t=>`<div class="group-title">${TIERS[t][0]}<span style="font-weight:400"> ・ ${TIERS[t][1]}</span></div>${group(t).map(card).join('')||'<div class="empty" style="padding:10px">まだありません</div>'}`).join('')}
+    <form class="panel" id="af" style="margin-top:18px">
+      <h3>${editingArea?'エリアを編集':'エリアを追加'}</h3>
+      <div class="grid">
+        <label class="full">エリア名<input name="name" required value="${v('name')}" placeholder="例：高田馬場駅 徒歩7分以内"></label>
+        <label>区分<select name="tier">${Object.entries(TIERS).map(([k,[l]])=>`<option value="${k}"${a.tier===k?' selected':''}>${l}</option>`).join('')}</select></label>
+        <label>月額の上限（万円）<input name="maxRent" type="number" min="0" value="${v('maxRent')}"></label>
+        <label>坪数（下限）<input name="minTsubo" type="number" min="0" value="${v('minTsubo')}"></label>
+        <label>坪数（上限）<input name="maxTsubo" type="number" min="0" value="${v('maxTsubo')}"></label>
+        <label class="full">Claudeへの要望<textarea name="note" placeholder="例：早稲田通り沿いを優先。地下は除外">${v('note')}</textarea></label>
+      </div>
+      <div class="actions"><button class="btn primary" type="submit">${editingArea?'変更を保存':'エリアを追加'}</button>
+      ${editingArea?'<button class="btn ghost" type="button" id="acancel">キャンセル</button><button class="btn danger" type="button" id="adel">削除する</button>':''}</div>
+    </form>`;
+  document.querySelectorAll('[data-ea]').forEach(b=>b.onclick=()=>{editingArea=b.dataset.ea;renderAreas();$('#af').scrollIntoView({behavior:'smooth'});});
+  if(editingArea){
+    $('#acancel').onclick=()=>{editingArea=null;renderAreas();};
+    $('#adel').onclick=async()=>{ const x=areas.find(y=>y.id===editingArea); if(!confirm(`「${x.name}」を削除しますか？`))return; await removeArea(editingArea); editingArea=null; renderAreas(); };
+  }
+  $('#af').onsubmit=async e=>{
+    e.preventDefault(); const fd=new FormData(e.target);
+    const d={name:fd.get('name').trim(),tier:fd.get('tier'),maxRent:num(fd.get('maxRent')),minTsubo:num(fd.get('minTsubo')),maxTsubo:num(fd.get('maxTsubo')),note:fd.get('note').trim(),updatedAt:Date.now()};
+    const id = editingArea || ('a'+Date.now().toString(36)+Math.random().toString(36).slice(2,6));
+    await saveArea(id,d); editingArea=null; renderAreas(); setStatus('探索エリアを保存しました');
+  };
+}
+async function saveArea(id,d){
+  const i=areas.findIndex(a=>a.id===id); if(i>=0) areas[i]={...d,id}; else areas.push({...d,id});
+  if(mode==='db'){ try{ await db.collection('areas').doc(id).set(d); }catch(e){ setStatus('保存できませんでした'); } } else lsSet('areas',areas);
+}
+async function removeArea(id){
+  areas=areas.filter(a=>a.id!==id);
+  if(mode==='db'){ try{ await db.collection('areas').doc(id).delete(); }catch(e){ setStatus('削除できませんでした'); } } else lsSet('areas',areas);
+}
+function setStatus(t){ $('#status').textContent=t; }
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{ tab=b.dataset.tab; editingArea=null; if(tab!=='form')editing=null; if(tab==='list')selected=null; render(); });
+
+// ---- storage ----
+function lsGet(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } }
+function lsSet(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+
+async function saveProp(id, d){
+  const i = props.findIndex(p=>p.id===id);
+  if(i>=0) props[i]={...d,id}; else props.push({...d,id});
+  if(mode==='db'){ try{ await db.collection('properties').doc(id).set(d); }catch(e){ setStatus('保存できませんでした：'+(e&&e.code||'error')); } }
+  else lsSet('props', props);
+}
+async function removeProp(id){
+  props = props.filter(p=>p.id!==id);
+  if(mode==='db'){ try{ await db.collection('properties').doc(id).delete(); }catch(e){ setStatus('削除できませんでした'); } }
+  else lsSet('props', props);
+}
+async function saveSettings(n){
+  S = {...DEFAULTS, ...n};
+  if(mode==='db'){ try{ await db.doc('settings/main').set(S); }catch(e){ setStatus('前提条件を保存できませんでした'); } }
+  else lsSet('settings', S);
+}
+
+(async function init(){
+  S = {...DEFAULTS, ...(lsGet('settings')||{})};
+  props = lsGet('props') || SEED_PROPS.map(p=>({...p}));
+  areas = lsGet('areas') || SEED_AREAS.map(a=>({...a}));
+  if(!lsGet('props')) lsSet('props', props);
+  if(!lsGet('areas')) lsSet('areas', areas);
+  render();
+  setStatus('この端末に保存されます。他の端末やスタッフと共有するには「前提」タブから書き出し／読み込みを使ってください');
+})();
+</script>
+</body>
+</html>
