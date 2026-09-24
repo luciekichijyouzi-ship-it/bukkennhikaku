@@ -135,20 +135,22 @@ const fmt = (n, d=0) => (n==null||!isFinite(n)) ? '—' : n.toLocaleString('ja-J
 const esc = s => String(s??'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num = v => (v===''||v==null) ? null : Number(v);
 
+const OVR = ['perSeat','labor','mat','other','hpb','equip','recruit','ramp','unitPrice','days','tsuboPerSeat'];
 function calc(p){
-  const seats = p.seats || Math.max(1, Math.round(p.tsubo / S.tsuboPerSeat));
-  const rev = p.actualRevenue || seats * S.perSeat;
+  const g = k => { const key = k==='hpb' ? 'hpb2' : k; return (p[key] ?? null) !== null ? Number(p[key]) : S[k]; };
+  const seats = p.seats || Math.max(1, Math.round(p.tsubo / g('tsuboPerSeat')));
+  const rev = p.actualRevenue || seats * g('perSeat');
   const tsuboPrice = p.rent / p.tsubo;
   const ratio = p.rent / rev * 100;
-  const varRate = (S.labor + S.mat + S.other) / 100;
-  const profit = rev * (1 - varRate) - S.hpb - p.rent;
+  const varRate = (g('labor') + g('mat') + g('other')) / 100;
+  const profit = rev * (1 - varRate) - g('hpb') - p.rent;
   const interior = (p.interior ?? null) !== null ? p.interior : S.interior;
   const emptyRent = p.rent * (p.vacancy || 0);
-  const invest = interior + S.equip + S.recruit + emptyRent;
-  const deposit = p.rent * S.depositMonths;
-  const payback = profit > 0 ? S.ramp + invest / profit : Infinity;
-  const customers = rev * 10000 / S.unitPrice;
-  const perSeatDay = customers / (seats * S.days);
+  const invest = interior + g('equip') + g('recruit') + emptyRent;
+  const deposit = (p.deposit ?? null) !== null ? p.deposit : p.rent * S.depositMonths;
+  const payback = profit > 0 ? g('ramp') + invest / profit : Infinity;
+  const customers = rev * 10000 / g('unitPrice');
+  const perSeatDay = customers / (seats * g('days'));
   const walkLimit = p.busy ? 15 : 10;
 
   const sc = {};
@@ -251,7 +253,7 @@ function renderDetail(){
       <tr><td>設備・採用費</td><td>${fmt(S.equip+S.recruit)}万円</td></tr>
       <tr><td>空家賃<small>${fmt(p.vacancy||0)}か月分</small></td><td>${fmt(c.emptyRent)}万円</td></tr>
       <tr><td>投資額（保証金除く）</td><td>${fmt(c.invest)}万円</td></tr>
-      <tr><td>保証金<small>${S.depositMonths}か月分・退去時に返還</small></td><td>${fmt(c.deposit)}万円</td></tr>
+      <tr><td>保証金<small>${(p.deposit??null)!==null?'手入力':`家賃${S.depositMonths}か月分`}・退去時に返還</small></td><td>${fmt(c.deposit)}万円</td></tr>
       <tr><td>投資回収期間<small>立ち上げ${S.ramp}か月＋投資額÷月間利益</small></td><td>${isFinite(c.payback)?fmt(c.payback)+'か月':'回収不可'}</td></tr>
     </table></div>
     ${p.note?`<div class="panel"><h3>メモ</h3><div class="note">${esc(p.note)}</div></div>`:''}
@@ -295,15 +297,40 @@ function renderForm(){
       <label class="full check"><input type="checkbox" name="busy"${p.busy?' checked':''}> 新宿・渋谷のように歩いて退屈しない街（徒歩15分まで可）</label>
       <label class="full check"><input type="checkbox" name="nightChecked"${p.nightChecked?' checked':''}> 夜の現地確認をした</label>
       <label>着工までの空家賃（か月）<input name="vacancy" type="number" min="0" step="0.5" value="${v('vacancy')}"></label>
+      <label>保証金（万円）<input name="deposit" type="number" min="0" value="${v('deposit')}" placeholder="空欄＝家賃${S.depositMonths}か月分"><div class="hint">実際の条件が分かれば入力</div></label>
       <label>内装費（万円）<input name="interior" type="number" min="0" value="${v('interior')}" placeholder="空欄＝${S.interior}"><div class="hint">居抜きなどで変わる場合のみ</div></label>
       <label>席数<input name="seats" type="number" min="1" value="${v('seats')}" placeholder="空欄＝自動"></label>
-      <label>実績月商（万円）<input name="actualRevenue" type="number" min="0" value="${v('actualRevenue')}"><div class="hint">既存店のみ</div></label>
+      <label>月商（万円）<input name="actualRevenue" type="number" min="0" value="${v('actualRevenue')}"><div class="hint">実績や見込みが決まっていれば入力。空欄なら席数×席あたり月商</div></label>
       <label class="full">メモ<textarea name="note">${v('note')}</textarea></label>
+    </div>
+    <h3 style="margin-top:20px">この物件だけの上書き</h3>
+    <p class="hint" style="margin:0 0 10px">空欄なら「前提」タブの値を使います。条件が分かっている物件だけ入力してください。</p>
+    <div class="grid">
+      <label>席あたり月商（万円）<input name="perSeat" type="number" step="any" min="0" value="${v('perSeat')}" placeholder="空欄＝${S.perSeat}"></label>
+      <label>人件費率（%）<input name="labor" type="number" step="any" min="0" value="${v('labor')}" placeholder="空欄＝${S.labor}"></label>
+      <label>材料費率（%）<input name="mat" type="number" step="any" min="0" value="${v('mat')}" placeholder="空欄＝${S.mat}"></label>
+      <label>その他経費率（%）<input name="other" type="number" step="any" min="0" value="${v('other')}" placeholder="空欄＝${S.other}"></label>
+      <label>HPB掲載費（万円/月）<input name="hpb2" type="number" step="any" min="0" value="${v('hpb2')}" placeholder="空欄＝${S.hpb}"></label>
+      <label>設備費（万円）<input name="equip" type="number" step="any" min="0" value="${v('equip')}" placeholder="空欄＝${S.equip}"></label>
+      <label>採用費（万円）<input name="recruit" type="number" step="any" min="0" value="${v('recruit')}" placeholder="空欄＝${S.recruit}"></label>
+      <label>立ち上げ期間（か月）<input name="ramp" type="number" step="any" min="0" value="${v('ramp')}" placeholder="空欄＝${S.ramp}"></label>
+      <label>目標客単価（円）<input name="unitPrice" type="number" step="any" min="0" value="${v('unitPrice')}" placeholder="空欄＝${S.unitPrice}"></label>
+      <label>月の営業日数<input name="days" type="number" step="any" min="0" value="${v('days')}" placeholder="空欄＝${S.days}"></label>
+      <label>1席あたりの坪数<input name="tsuboPerSeat" type="number" step="any" min="0" value="${v('tsuboPerSeat')}" placeholder="空欄＝${S.tsuboPerSeat}"></label>
+      <div class="full"><button class="btn ghost" type="button" id="clearovr">上書きをすべて消して前提の値に戻す</button>
+      <div class="hint" id="clearmsg">席数・内装費・保証金・月商の手入力も一緒に消えます</div></div>
     </div>
     <div class="actions"><button class="btn primary" type="submit">${editing?'変更を保存':'物件を追加'}</button>
     <button class="btn ghost" type="button" id="cancel">キャンセル</button></div>
   </form>`;
   $('#cancel').onclick=()=>{editing=null;tab='list';render();};
+  $('#clearovr').onclick=()=>{
+    const f=$('#f');
+    ['perSeat','labor','mat','other','hpb2','equip','recruit','ramp','unitPrice','days','tsuboPerSeat','seats','interior','deposit','actualRevenue','vacancy'].forEach(k=>{
+      const el=f.elements[k]; if(el){ el.value = k==='vacancy' ? 0 : ''; el.classList.remove('filled'); }
+    });
+    $('#clearmsg').textContent='前提タブの値に戻しました。保存すると反映されます。';
+  };
   const sb = $('#shotbtn'); if(sb) sb.onclick = readShot;
   applyImgCaps();
   const sfi = $('#shotfile'); if(sfi) sfi.onchange = ()=>{ const m=$('#shotmsg'); if(m){ m.className='msg'; m.textContent = sfi.files.length ? `${sfi.files.length}枚を選択しました。「読み取る」を押してください。` : ''; } };
@@ -314,8 +341,11 @@ function renderForm(){
       name:fd.get('name').trim(), station:fd.get('station').trim(), kind:fd.get('kind'),
       rent:num(fd.get('rent')), tsubo:num(fd.get('tsubo')), floor:fd.get('floor'), floorLabel:fd.get('floorLabel').trim(),
       walk:num(fd.get('walk')), night:num(fd.get('night')), weekend:num(fd.get('weekend')), hpb:num(fd.get('hpb')), lines:num(fd.get('lines')), commuteMin:num(fd.get('commuteMin')), appeal:num(fd.get('appeal')), living:num(fd.get('living')), busy:fd.get('busy')==='on', nightChecked:fd.get('nightChecked')==='on',
-      vacancy:num(fd.get('vacancy'))||0, interior:num(fd.get('interior')), seats:num(fd.get('seats')),
-      actualRevenue:num(fd.get('actualRevenue')), note:fd.get('note').trim(), updatedAt:Date.now()
+      vacancy:num(fd.get('vacancy'))||0, deposit:num(fd.get('deposit')), interior:num(fd.get('interior')), seats:num(fd.get('seats')),
+      actualRevenue:num(fd.get('actualRevenue')), note:fd.get('note').trim(), updatedAt:Date.now(),
+      perSeat:num(fd.get('perSeat')), labor:num(fd.get('labor')), mat:num(fd.get('mat')), other:num(fd.get('other')),
+      hpb2:num(fd.get('hpb2')), equip:num(fd.get('equip')), recruit:num(fd.get('recruit')), ramp:num(fd.get('ramp')),
+      unitPrice:num(fd.get('unitPrice')), days:num(fd.get('days')), tsuboPerSeat:num(fd.get('tsuboPerSeat'))
     };
     const id = editing || ('p' + Date.now().toString(36) + Math.random().toString(36).slice(2,6));
     await saveProp(id, d);
